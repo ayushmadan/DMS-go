@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/SebastiaanKlippert/go-wkhtmltopdf"
 	"github.com/joho/godotenv"
+	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 func getRoot(w http.ResponseWriter, r *http.Request) {
@@ -52,8 +53,6 @@ func azureblob() {
 
 	// Create the container
 	data := []byte("\nhello world this is a blob\n")
-	containerName := fmt.Sprintf("quickstart-%s", randomString())
-	fmt.Printf("Creating a container named %s\n", containerName)
 	_, err1 := serviceClient.UploadBuffer(ctx, "test", "test-go", data, nil)
 	if err1 != nil {
 		log.Fatal(err1)
@@ -61,9 +60,33 @@ func azureblob() {
 }
 
 func GetMessage() {
-	//kafka integration to be done
-}
+	run := true
+	// make a new reader that consumes from topic-A, partition 0, at offset 42
+	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
+		"bootstrap.servers": "20.219.165.69:9093",
+		"group.id":          "foo",
+		"auto.offset.reset": "smallest"})
+	topics := []string{}
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	err = consumer.SubscribeTopics(topics, nil)
+
+	for run == true {
+		ev := consumer.Poll(100)
+		switch e := ev.(type) {
+		case *kafka.Message:
+			fmt.Fprintf(os.Stdin, "%% Error: %v\n", e)
+		case kafka.Error:
+			fmt.Fprintf(os.Stderr, "%% Error: %v\n", e)
+			run = false
+		default:
+			fmt.Printf("Ignored %v\n", e)
+		}
+	}
+
+}
 func htmltopdf() {
 	// Create new PDF generator
 	pdfg, err := wkhtmltopdf.NewPDFGenerator()
