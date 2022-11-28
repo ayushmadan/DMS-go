@@ -2,18 +2,19 @@ package main
 
 import (
 	// "errors"
+	"context"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
-	"github.com/SebastiaanKlippert/go-wkhtmltopdf"
-	"context"
 	"math/rand"
+	"net/http"
+	"os"
 	"strconv"
 	"time"
-	// "github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	// "os"
+	"github.com/SebastiaanKlippert/go-wkhtmltopdf"
+	"github.com/joho/godotenv"
 )
 
 func getRoot(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +28,43 @@ func getHello(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 	azureblob()
+
+}
+
+func randomString() string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return strconv.Itoa(r.Int())
+}
+
+func azureblob() {
+	fmt.Printf("Azure Blob storage quick start sample\n")
+	ctx := context.Background()
+	connectionString := os.Getenv("AZURE_STORAGE_ACCOUNT_CONNECTION_STRING")
+	serviceClient, err := azblob.NewClientFromConnectionString(connectionString, nil)
+	if err != nil {
+		log.Fatal("Invalid credentials with error: " + err.Error())
+	}
+
+	// Create the container
+	data := []byte("\nhello world this is a blob\n")
+	containerName := fmt.Sprintf("quickstart-%s", randomString())
+	fmt.Printf("Creating a container named %s\n", containerName)
+	_, err1 := serviceClient.UploadBuffer(ctx, "test", "test-go", data, nil)
+	if err1 != nil {
+		log.Fatal(err1)
+	}
+}
+
+func GetMessage() {
+	//kafka integration to be done
+}
+
+func htmltopdf() {
 	// Create new PDF generator
 	pdfg, err := wkhtmltopdf.NewPDFGenerator()
 	if err != nil {
@@ -41,7 +78,7 @@ func main() {
 
 	// Create a new input page from an URL
 	page := wkhtmltopdf.NewPage("./index.html")
-	
+
 	// Set options for this page
 	page.FooterRight.Set("[page]")
 	page.FooterFontSize.Set(10)
@@ -64,55 +101,3 @@ func main() {
 
 	fmt.Println("Done")
 }
-
-
-
-
-func randomString() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return strconv.Itoa(r.Int())
-}
-
-func azureblob() {
-	fmt.Printf("Azure Blob storage quick start sample\n")
-	ctx := context.Background()
-	connectionString:= "DefaultEndpointsProtocol=https;AccountName=doctorlistingingestionpr;AccountKey=+xu1up2YWmlmAvJmzfEsAbyaB7FUoARys0ZOL/oKQTBAurHhnWdL+Ri0GefqG9kxxizP5wJbLBuNon9wu9BZcQ==;EndpointSuffix=core.windows.net;"
-
-	serviceClient, err := azblob.NewClientFromConnectionString(connectionString, nil)
-	if err != nil {
-		log.Fatal("Invalid credentials with error: " + err.Error())
-	}
-	
-
-	// Create the container
-	data := []byte("\nhello world this is a blob\n")
-	containerName := fmt.Sprintf("quickstart-%s", randomString())
-	fmt.Printf("Creating a container named %s\n", containerName)
-	_, err1 := serviceClient.UploadBuffer(ctx, "test", "test-go", data, nil)
-	if err1 != nil {
-		log.Fatal(err1)
-	}
-}
-
-// func GetMessage(count int, client *azservicebus.Client) {
-// 	receiver, err := client.NewReceiverForQueue("myqueue", nil) //Change myqueue to env var
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	defer receiver.Close(context.TODO())
-
-// 	messages, err := receiver.ReceiveMessages(context.TODO(), count, nil)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-
-// 	for _, message := range messages {
-// 		body := message.Body
-// 		fmt.Printf("%s\n", string(body))
-
-// 		err = receiver.CompleteMessage(context.TODO(), message, nil)
-// 		if err != nil {
-// 			panic(err)
-// 		}
-// 	}
-// }
