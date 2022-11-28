@@ -15,7 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/SebastiaanKlippert/go-wkhtmltopdf"
 	"github.com/joho/godotenv"
-	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
+	"github.com/segmentio/kafka-go"
 )
 
 func getRoot(w http.ResponseWriter, r *http.Request) {
@@ -33,8 +33,8 @@ func main() {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	azureblob()
-
+	testConn()
+	GetMessage()
 }
 
 func randomString() string {
@@ -60,31 +60,55 @@ func azureblob() {
 }
 
 func GetMessage() {
-	run := true
-	// make a new reader that consumes from topic-A, partition 0, at offset 42
-	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "20.219.165.69:9093",
-		"group.id":          "foo",
-		"auto.offset.reset": "smallest"})
-	topics := []string{}
+
+	w := &kafka.Writer{
+		Addr:                   kafka.TCP(os.Getenv("KAFKA_CONNECTION_STRING")),
+		Topic:                  "test",
+		Balancer:               &kafka.LeastBytes{},
+		AllowAutoTopicCreation: true,
+	}
+
+	err := w.WriteMessages(context.Background(),
+		kafka.Message{
+			Key:   []byte("Key-A"),
+			Value: []byte("Hello World!"),
+		},
+		kafka.Message{
+			Key:   []byte("Key-B"),
+			Value: []byte("One!"),
+		},
+		kafka.Message{
+			Key:   []byte("Key-C"),
+			Value: []byte("Two!"),
+		},
+	)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to write messages:", err)
 	}
 
-	err = consumer.SubscribeTopics(topics, nil)
+	if err := w.Close(); err != nil {
+		log.Fatal("failed to close writer:", err)
+	}
 
-	for run == true {
-		ev := consumer.Poll(100)
-		switch e := ev.(type) {
-		case *kafka.Message:
-			fmt.Fprintf(os.Stdin, "%% Error: %v\n", e)
-		case kafka.Error:
-			fmt.Fprintf(os.Stderr, "%% Error: %v\n", e)
-			run = false
-		default:
-			fmt.Printf("Ignored %v\n", e)
+	go func() {
+		r := kafka.NewReader(kafka.ReaderConfig{
+			Brokers: []string{os.Getenv("KAFKA_CONNECTION_STRING")},
+			Topic:   "test",
+			GroupID: "my-group",
+		})
+		for {
+			// the `ReadMessage` method blocks until we receive the next event
+			msg, err := r.ReadMessage(context.Background())
+			if err != nil {
+				panic("could not read message " + err.Error())
+			}
+			// after receiving the message, log its value
+			fmt.Println("received: ", string(msg.Value))
 		}
-	}
+	}()
+	// initialize a new reader with the brokers and topic
+	// the groupID identifies the consumer and prevents
+	// it from receiving duplicate messages
 
 }
 func htmltopdf() {
@@ -123,4 +147,25 @@ func htmltopdf() {
 	}
 
 	fmt.Println("Done")
+}
+func testConn() {
+	conn, err := kafka.Dial("tcp", os.Getenv("KAFKA_CONNECTION_STRING"))
+	if err != nil {
+		panic(err.Error())
+	}
+	defer conn.Close()
+
+	partitions, err := conn.ReadPartitions()
+	if err != nil {
+		panic(err.Error())
+	}
+
+	m := map[string]struct{}{}
+
+	for _, p := range partitions {
+		m[p.Topic] = struct{}{}
+	}
+	for k := range m {
+		fmt.Println(k)
+	}
 }
