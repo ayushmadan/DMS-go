@@ -1,4 +1,4 @@
-module main
+module dev.azure.com/ayushmadan/ebhdms
 
 go 1.19
 
@@ -21,5 +21,4 @@ require (
 	golang.org/x/net v0.2.0 // indirect
 	golang.org/x/sys v0.2.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
-	gopkg.in/confluentinc/confluent-kafka-go.v1 v1.8.2 // indirect
 )
